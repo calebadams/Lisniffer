@@ -63,10 +63,11 @@ class Packet_Sniffer:
         
         self.packetCount = 0
         
-        sniff(filter="ip", prn=lambda x: self.print_tree_node(x), timeout=int(self.spinBoxVal))
+        sniff(prn=lambda x: self.print_tree_node(x), timeout=int(self.spinBoxVal))
         
         self.ipTree.tag_configure('TCP', background='green')
         self.ipTree.tag_configure('UDP', background='blue')
+        self.ipTree.tag_configure('ICMP', background='red')
         
         self.ipTree.pack()
         
@@ -116,6 +117,22 @@ class Packet_Sniffer:
                 self.ipTree.insert(id, 'end', text="Checksum:\t" + udp_chksum)
                 self.ipTree.insert(id, 'end', text="Length:\t\t" + str(ip_len))
                 self.ipTree.insert(id, 'end', text="Time:\t\t" + str(ip_time))
+                
+            if ICMP in pkt:
+                icmp_code = pkt[ICMP].code # code
+                icmp_id = hex(pkt[ICMP].id) # id
+                icmp_chksum = hex(pkt[ICMP].chksum) # Checksum
+                icmp_seq = hex(pkt[ICMP].seq) # seq
+                
+                id = self.ipTree.insert("" , self.packetCount - 1, 
+                                        text="Packet #" + str(self.packetCount) + 
+                                        ": ICMP ", tags = ("ICMP"))
+                
+                self.ipTree.insert(id, 'end', text="Code:\t\t" + str(icmp_code))  
+                self.ipTree.insert(id, 'end', text="Checksum:\t" + icmp_chksum)
+                self.ipTree.insert(id, 'end', text="Id:\t\t" + icmp_id)
+                self.ipTree.insert(id, 'end', text="Seq:\t\t" + icmp_seq)
+                
         
     def close_windows(self):
         self.master.destroy()
