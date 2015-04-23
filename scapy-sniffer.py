@@ -63,7 +63,7 @@ class Packet_Sniffer:
         
         self.packetCount = 0
         
-        sniff(filter="icmp and ip", prn=lambda x: self.print_tree_node(x), timeout=int(self.spinBoxVal))
+        sniff(filter="ip", prn=lambda x: self.print_tree_node(x), timeout=int(self.spinBoxVal))
         
         self.ipTree.tag_configure('TCP', background='green')
         self.ipTree.tag_configure('UDP', background='blue')
