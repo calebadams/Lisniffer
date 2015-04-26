@@ -4,6 +4,7 @@ import datetime
 import time
 import threading
 import os
+import tkMessageBox
 from scapy.all import *
 
 class Main_Gui:
@@ -24,30 +25,31 @@ class Main_Gui:
         
         # Set the frame to the same size
         self.frame = tk.Frame(self.master, width=self.windowWidth, height=self.windowHeight)
-        self.frame.pack_propagate(0) # set the flag to use the size
+        self.frame.grid(row = 0, column = 0, rowspan = 3, columnspan = 3)
         
         # Create our background, must use label widget to do so in Tkinter
         self.backgroundLabel = tk.Label(self.frame, image=self.image)
-        self.backgroundLabel.place(x = 0, y = 0, relwidth=1, relheight=1)
-
+        self.backgroundLabel.grid(column = 0, row = 0, columnspan=3, rowspan=4)
+    
         # Create a label to indicate capture time
         self.label = tk.Label(self.frame, text="Capture Time:", font=("Helvetica", 18))
-        self.label.place(x = 120, y = 100)
+        self.label.grid(row = 0, column = 0)
         
         # Create a spinbox that takes anywhere from 1 to 60 seconds
         self.spinBox = tk.Spinbox(self.frame, from_=1, to=60)
-        self.spinBox.place(x = 310, y = 100)
+        self.spinBox.grid(row = 0, column = 1)
+        
+        # Create a label for seconds
+        self.label = tk.Label(self.frame, text="sec", font=("Helvetica", 18))
+        self.label.grid(row = 0, column = 2, sticky = tk.W)
         
         # Create a start button to begin sniff/capture
         self.startButton = tk.Button(self.frame, text = "Start", command = self.new_window, width = 50)
-        self.startButton.place(x = 110, y = 190)
+        self.startButton.grid(row = 1, column = 0, columnspan = 3)
         
         # Create print button to print to the default printer
         self.printButton = tk.Button(self.frame, text = 'Print', width = 50, command = self.print_file)
-        self.printButton.place(x = 110, y = 250)  
-        
-        # Pack the frame within the main gui
-        self.frame.pack()
+        self.printButton.grid(row = 2, column = 0, columnspan = 3)
         
     def print_file(self):
         # Create a new thread to print packets.txt, which is written to during
@@ -60,7 +62,6 @@ class Main_Gui:
     def new_window(self):
         # Create a new window using Toplevel (Tkinter practices)        
         self.newWindow = tk.Toplevel(self.master)
-        self.newWindow.geometry("500x500") # Set the geometry to be a simple 500 x 500 window
         
         self.packet_sniffer_app = Packet_Sniffer(self.newWindow) # Create a new packet sniffer object
         
@@ -68,7 +69,7 @@ class Main_Gui:
         sniffThread = threading.Thread(target=sniffer, args=(self.spinBox.get(),self.packet_sniffer_app))
         self.threads.append(sniffThread)
         sniffThread.start()
-
+        
 class Packet_Sniffer:
     def __init__(self, master):
         self.master = master
@@ -82,16 +83,16 @@ class Packet_Sniffer:
         self.master.after(10, self.check_bool)
         self.outputFile = open('packets.txt', 'w') # Open the packets output file that can be printed later
         
-        # Initialize GUI and pack the frame to get it to show up in our new window
+        # Initialize GUI and set the grid of the frame to get it to show up in our new window
         self.init_gui()
-        self.frame.pack()
+        self.frame.grid(row = 0, column = 0, rowspan = 2)
         
     def init_gui(self):
         self.frame = tk.Frame(self.master) # Init the frame
             
         # Create a close button to close the window
         self.closeButton = tk.Button(self.frame, text = 'Close', width = 25, command = self.close_window)
-        self.closeButton.pack()
+        self.closeButton.grid(row = 1, column = 0)
         
         # Create our IP ttk treeview
         self.ipTree = ttk.Treeview(self.frame, height = 25)
@@ -108,7 +109,7 @@ class Packet_Sniffer:
         self.ipTree.tag_configure('UDP', background="yellow")
         self.ipTree.tag_configure('ICMP', background="cyan")
         
-        self.ipTree.pack() # Pack the IP treeview to show in the window
+        self.ipTree.grid(row = 0, column = 0)
         
     def print_tree_node(self, pkt):  
         # Parse the packet      
@@ -210,12 +211,12 @@ class Packet_Sniffer:
                 print >> self.outputFile, "Time:\t\t" + ip_time + '\n'
                 
             if ICMP in pkt: # If its an ICMP packet
-                self.packetCount = self.packetCount + 1 # Inrement the packet counter
-                
+                self.packetCount = self.packetCount + 1 # Increment the packet counter
+
                 # Store the various elements of the packet
                 icmp_code = pkt[ICMP].code # code
                 icmp_chksum = hex(pkt[ICMP].chksum) # Checksum
-                icmp_seq = hex(pkt[ICMP].seq) # seq
+                icmp_seq = str(pkt[ICMP].seq) # seq
                 
                 # Insert the parent treeview element indicating packet number, protocol, src and dst IP
                 id = self.ipTree.insert("" , self.packetCount - 1, 
@@ -259,6 +260,7 @@ class Packet_Sniffer:
 def sniffer(capTime, app): # Sniffer thread function
     sniff(prn=lambda x: app.print_tree_node(x), timeout=int(capTime)) # Start sniffing
     app.set_bool_update(True) # Set the update boolean to true
+    tkMessageBox.showinfo("Success", "Sniffing complete") # Display message to indicate sniffing is complete
     app.close_out_file() # Close the output file 
 
 def main():
