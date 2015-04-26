@@ -1,115 +1,195 @@
 import Tkinter as tk
 import ttk
-from scapy.all import *
 import datetime
+import time
+import threading
+import os
+from scapy.all import *
 
 class Main_Gui:
     def __init__(self, master):
         self.master = master
+        
+        # Create an empty list of threads and initialize the main gui window
+        self.threads = []
         self.init_gui()
         
     def init_gui(self):
-        self.image = tk.PhotoImage(file="pure-acid.gif")
+        self.master.title("Lisniffer") # Set the title of the app
+        self.image = tk.PhotoImage(file="pure-acid.gif") # Create our background image
         
+        # Store the height and widths of the window
         self.windowWidth = self.image.width()
         self.windowHeight = self.image.height()
         
+        # Set the frame to the same size
         self.frame = tk.Frame(self.master, width=self.windowWidth, height=self.windowHeight)
         self.frame.pack_propagate(0) # set the flag to use the size
         
-        self.master.title("Lisniffer")
+        # Create our background, must use label widget to do so in Tkinter
         self.backgroundLabel = tk.Label(self.frame, image=self.image)
-        self.backgroundLabel.place(x=0, y=0, relwidth=1, relheight=1)
+        self.backgroundLabel.place(x = 0, y = 0, relwidth=1, relheight=1)
 
-        self.label = tk.Label(self.frame, text="Capture Time:", font=("Helvetica", 20))
-        self.label.place(x = 140, y = 160)
+        # Create a label to indicate capture time
+        self.label = tk.Label(self.frame, text="Capture Time:", font=("Helvetica", 18))
+        self.label.place(x = 120, y = 100)
         
+        # Create a spinbox that takes anywhere from 1 to 60 seconds
         self.spinBox = tk.Spinbox(self.frame, from_=1, to=60)
-        self.spinBox.place(x = 290, y = 160)
+        self.spinBox.place(x = 310, y = 100)
         
+        # Create a start button to begin sniff/capture
         self.startButton = tk.Button(self.frame, text = "Start", command = self.new_window, width = 50)
         self.startButton.place(x = 110, y = 190)
         
+        # Create print button to print to the default printer
+        self.printButton = tk.Button(self.frame, text = 'Print', width = 50, command = self.print_file)
+        self.printButton.place(x = 110, y = 250)  
+        
+        # Pack the frame within the main gui
         self.frame.pack()
         
+    def print_file(self):
+        # Create a new thread to print packets.txt, which is written to during
+        # the sniff in the Packet_Sniffer
+        printThread = threading.Thread(target=os.system("lpr packets.txt"))
+        self.threads.append(printThread) # Append to our list of threads
+        printThread.start() # Start the thread
+        
+        
     def new_window(self):
-        Main_Gui.spinBoxVal = self.spinBox.get()
-        
+        # Create a new window using Toplevel (Tkinter practices)        
         self.newWindow = tk.Toplevel(self.master)
-        self.newWindow.geometry("500x500")
+        self.newWindow.geometry("500x500") # Set the geometry to be a simple 500 x 500 window
         
-        self.app = Packet_Sniffer(self.newWindow)
+        self.packet_sniffer_app = Packet_Sniffer(self.newWindow) # Create a new packet sniffer object
+        
+        # Start second thread for sniff
+        sniffThread = threading.Thread(target=sniffer, args=(self.spinBox.get(),self.packet_sniffer_app))
+        self.threads.append(sniffThread)
+        sniffThread.start()
 
 class Packet_Sniffer:
     def __init__(self, master):
         self.master = master
+
+        # Initialize the packet count to 0 and initialize the boolean to false
         self.packetCount = 0
+        self.bool_update = False
         
-        self.init_gui() 
+        # Calls check_bool after 10 milliseconds, and will check every 10 milliseconds
+        # thereafter
+        self.master.after(10, self.check_bool)
+        self.outputFile = open('packets.txt', 'w') # Open the packets output file that can be printed later
+        
+        # Initialize GUI and pack the frame to get it to show up in our new window
+        self.init_gui()
         self.frame.pack()
         
     def init_gui(self):
-        self.frame = tk.Frame(self.master)
+        self.frame = tk.Frame(self.master) # Init the frame
+            
+        # Create a close button to close the window
+        self.closeButton = tk.Button(self.frame, text = 'Close', width = 25, command = self.close_window)
+        self.closeButton.pack()
         
-        self.spinBoxVal = Main_Gui.spinBoxVal
-        
-        self.quitButton = tk.Button(self.frame, text = 'Close', width = 25, command = self.close_windows)
-        self.quitButton.pack()   
-        
+        # Create our IP ttk treeview
         self.ipTree = ttk.Treeview(self.frame, height = 25)
         
+        # Setup the column and heading characteristics
         self.ipTree.column("#0",  minwidth = 450, width = 495, stretch=tk.NO)
         self.ipTree.heading("#0", text="Packets")
         
+        # Reset the packet count
         self.packetCount = 0
         
-        sniff(prn=lambda x: self.print_tree_node(x), timeout=int(self.spinBoxVal))
-        
+        # Configure the various protocols to display different colors in treeview
         self.ipTree.tag_configure('TCP', background='green')
-        self.ipTree.tag_configure('UDP', background='blue')
-        self.ipTree.tag_configure('ICMP', background='red')
+        self.ipTree.tag_configure('UDP', background="yellow")
+        self.ipTree.tag_configure('ICMP', background="cyan")
         
-        self.ipTree.pack()
+        self.ipTree.pack() # Pack the IP treeview to show in the window
         
-    def print_tree_node(self, pkt):
-        if IP in pkt:
+    def print_tree_node(self, pkt):  
+        # Parse the packet      
+        if IP in pkt: # If its an IP packet, begin processing
             
-            self.packetCount = self.packetCount + 1
-            
+            # Store the source and destinatin IP addresses
             ip_src = pkt[IP].src
             ip_dst = pkt[IP].dst
             
+            # Store the time and length of the packet
             ip_time = datetime.datetime.fromtimestamp(pkt[IP].time).strftime('%Y-%m-%d %H:%M:%S')
             ip_len = pkt[IP].len
             
-            if TCP in pkt:
-                tcp_sport = pkt[TCP].sport # Source port
-                tcp_dport = pkt[TCP].dport # Destination port
-                tcp_checksum = hex(pkt[TCP].chksum) # Checksum
+            if TCP in pkt: # If its a TCP packet
+                self.packetCount = self.packetCount + 1 # Increment the packet counter
                 
+                # Store the various elements of the packet
+                tcp_sport = pkt[TCP].sport
+                tcp_dport = pkt[TCP].dport
+                tcp_checksum = hex(pkt[TCP].chksum)
+                tcp_seq = str(pkt[TCP].seq)
+                tcp_ack = str(pkt[TCP].ack)
+                tcp_dataofs = str(pkt[TCP].dataofs)
+                tcp_reserved = str(pkt[TCP].reserved)
+                tcp_flags = hex(pkt[TCP].flags)
+                tcp_window = str(pkt[TCP].window)
+                tcp_urgptr = str(pkt[TCP].urgptr)
+                
+                # Insert the parent treeview element indicating packet number, protocol, src and dst IP
                 id = self.ipTree.insert("" , self.packetCount - 1, 
                                         text="Packet #" + str(self.packetCount) + 
                                         ": TCP " + str(ip_src) + " to " + str(ip_dst), tags = ("TCP"))
                 
-                # Insert tree data
+                # Insert packet data into the treeview parent ID
                 self.ipTree.insert(id, 'end', text="Src IP:\t\t" + str(ip_src))
                 self.ipTree.insert(id, 'end', text="Scr Port:\t\t" + str(tcp_sport))
                 self.ipTree.insert(id, 'end', text="Dst IP:\t\t" + str(ip_dst))
                 self.ipTree.insert(id, 'end', text="Dst Port:\t\t" + str(tcp_dport))
-                self.ipTree.insert(id, 'end', text="Checksum:\t" + tcp_checksum)
                 self.ipTree.insert(id, 'end', text="Length:\t\t" + str(ip_len))
                 self.ipTree.insert(id, 'end', text="Time:\t\t" + ip_time)
+                self.ipTree.insert(id, 'end', text="Seq:\t\t" + tcp_seq)
+                self.ipTree.insert(id, 'end', text="Ack:\t\t" + tcp_ack)
+                self.ipTree.insert(id, 'end', text="Offset:\t\t" + tcp_dataofs)
+                self.ipTree.insert(id, 'end', text="Reserved:\t" + tcp_reserved)
+                self.ipTree.insert(id, 'end', text="Flags:\t\t" + tcp_flags)
+                self.ipTree.insert(id, 'end', text="Window:\t\t" + tcp_window)
+                self.ipTree.insert(id, 'end', text="Checksum:\t" + tcp_checksum)
+                self.ipTree.insert(id, 'end', text="Urgptr:\t\t" + tcp_urgptr)
+                
+                # Print the packet data to the output file 
+                print >> self.outputFile, "Packet #" + str(self.packetCount)
+                print >> self.outputFile, "Proto:\t\tTCP"
+                print >> self.outputFile, "Src IP:\t\t" + str(ip_src)
+                print >> self.outputFile, "Scr Port:\t" + str(tcp_sport)
+                print >> self.outputFile, "Dst IP:\t\t" + str(ip_dst)
+                print >> self.outputFile, "Dst Port:\t" + str(tcp_dport)
+                print >> self.outputFile, "Length:\t\t" + str(ip_len)
+                print >> self.outputFile, "Time:\t\t" + ip_time
+                print >> self.outputFile, "Seq:\t\t" + tcp_seq
+                print >> self.outputFile, "Ack:\t\t" + tcp_ack
+                print >> self.outputFile, "Offset:\t\t" + tcp_dataofs
+                print >> self.outputFile, "Reserved:\t" + tcp_reserved
+                print >> self.outputFile, "Flags:\t\t" + tcp_flags
+                print >> self.outputFile, "Window:\t\t" + tcp_window
+                print >> self.outputFile, "Checksum:\t" + tcp_checksum
+                print >> self.outputFile, "Urgptr:\t\t" + tcp_urgptr + '\n'
                     
             if UDP in pkt:
-                udp_sport = pkt[UDP].sport # Source port
-                udp_dport = pkt[UDP].dport # Destination port
-                udp_chksum = hex(pkt[UDP].chksum) # Checksum
-                    
+                self.packetCount = self.packetCount + 1 # Increment the packet counter
+
+                # Store the various elements of the packet
+                udp_sport = pkt[UDP].sport
+                udp_dport = pkt[UDP].dport
+                udp_chksum = hex(pkt[UDP].chksum)
+                
+                # Insert the parent treeview element indicating packet number, protocol, src and dst IP
                 id = self.ipTree.insert("" , self.packetCount - 1, 
                                         text="Packet #" + str(self.packetCount) + 
                                         ": UDP " + str(ip_src) + " to " + str(ip_dst), tags = ("UDP"))
                 
-                # Insert tree data
+                # Insert packet data into the treeview parent ID
                 self.ipTree.insert(id, 'end', text="Src IP:\t\t" + str(ip_src))
                 self.ipTree.insert(id, 'end', text="Src Port:\t\t" + str(udp_sport))
                 self.ipTree.insert(id, 'end', text="Dst IP:\t\t" + str(ip_dst))
@@ -118,29 +198,73 @@ class Packet_Sniffer:
                 self.ipTree.insert(id, 'end', text="Length:\t\t" + str(ip_len))
                 self.ipTree.insert(id, 'end', text="Time:\t\t" + str(ip_time))
                 
-            if ICMP in pkt:
+                # Print the packet data to the output file 
+                print >> self.outputFile, "Packet #" + str(self.packetCount)
+                print >> self.outputFile, "Proto:\t\tUDP"
+                print >> self.outputFile, "Src IP:\t\t" + str(ip_src)
+                print >> self.outputFile, "Scr Port:\t" + str(udp_sport)
+                print >> self.outputFile, "Dst IP:\t\t" + str(ip_dst)
+                print >> self.outputFile, "Dst Port:\t" + str(udp_dport)
+                print >> self.outputFile, "Checksum:\t" + udp_chksum
+                print >> self.outputFile, "Length:\t\t" + str(ip_len)
+                print >> self.outputFile, "Time:\t\t" + ip_time + '\n'
+                
+            if ICMP in pkt: # If its an ICMP packet
+                self.packetCount = self.packetCount + 1 # Inrement the packet counter
+                
+                # Store the various elements of the packet
                 icmp_code = pkt[ICMP].code # code
-                icmp_id = hex(pkt[ICMP].id) # id
                 icmp_chksum = hex(pkt[ICMP].chksum) # Checksum
                 icmp_seq = hex(pkt[ICMP].seq) # seq
                 
+                # Insert the parent treeview element indicating packet number, protocol, src and dst IP
                 id = self.ipTree.insert("" , self.packetCount - 1, 
                                         text="Packet #" + str(self.packetCount) + 
-                                        ": ICMP ", tags = ("ICMP"))
+                                        ": ICMP " + str(ip_src) + " to " + str(ip_dst), tags = ("ICMP"))
                 
+                # Insert packet data into the treeview parent ID
+                self.ipTree.insert(id, 'end', text="Src IP:\t\t" + str(ip_src))
+                self.ipTree.insert(id, 'end', text="Dst IP:\t\t" + str(ip_dst))
                 self.ipTree.insert(id, 'end', text="Code:\t\t" + str(icmp_code))  
                 self.ipTree.insert(id, 'end', text="Checksum:\t" + icmp_chksum)
-                self.ipTree.insert(id, 'end', text="Id:\t\t" + icmp_id)
                 self.ipTree.insert(id, 'end', text="Seq:\t\t" + icmp_seq)
+                self.ipTree.insert(id, 'end', text="Length:\t\t" + str(ip_len))
+                self.ipTree.insert(id, 'end', text="Time:\t\t" + str(ip_time))
                 
+                # Print the packet data to the output file
+                print >> self.outputFile, "Packet #" + str(self.packetCount)
+                print >> self.outputFile, "Proto:\t\tICMP"
+                print >> self.outputFile, "Src IP:\t\t" + str(ip_src)
+                print >> self.outputFile, "Dst IP:\t\t" + str(ip_dst)
+                print >> self.outputFile, "Code:\t\t" + str(icmp_code)
+                print >> self.outputFile, "Checksum:\t" + icmp_chksum
+                print >> self.outputFile, "Seq:\t\t" + icmp_seq
+                print >> self.outputFile, "Length:\t\t" + str(ip_len)
+                print >> self.outputFile, "Time:\t\t" + ip_time + '\n'
         
-    def close_windows(self):
-        self.master.destroy()
+    def set_bool_update(self, val):
+        self.bool_update = val # Set the boolean to the value
+    
+    def check_bool(self):
+        if self.bool_update: # Checks the boolean value
+            self.master.update() # If it's set sniff is complete, update
+        self.master.after(10, self.check_bool) # Recursive call to check again after 10 milliseconds
+        
+    def close_window(self):
+        self.master.destroy() # Close the window
+    
+    def close_out_file(self):
+        self.outputFile.close() # Close the output file
+        
+def sniffer(capTime, app): # Sniffer thread function
+    sniff(prn=lambda x: app.print_tree_node(x), timeout=int(capTime)) # Start sniffing
+    app.set_bool_update(True) # Set the update boolean to true
+    app.close_out_file() # Close the output file 
 
-def main(): 
-    root = tk.Tk()
-    app = Main_Gui(root)
-    root.mainloop()
+def main():
+    root = tk.Tk() # Create root Tkinter app
+    app = Main_Gui(root) # Create the main gui window
+    root.mainloop() # Start the main thread for Tkinter gui
 
 if __name__ == '__main__':
     main()
