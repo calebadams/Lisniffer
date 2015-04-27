@@ -178,7 +178,7 @@ class Packet_Sniffer:
                 self.ipTree.insert(id, 'end', text = "Seq:\t\t" + tcp_seq)
                 self.ipTree.insert(id, 'end', text = "Ack:\t\t" + tcp_ack)
                 self.ipTree.insert(id, 'end', text = "Offset:\t\t" + tcp_dataofs)
-                self.ipTree.insert(id, 'end', text = "Reserved:\t" + tcp_reserved)
+                self.ipTree.insert(id, 'end', text = "Reserved:\t\t" + tcp_reserved)
                 self.ipTree.insert(id, 'end', text = "Flags:\t\t" + tcp_flags)
                 self.ipTree.insert(id, 'end', text = "Window:\t\t" + tcp_window)
                 self.ipTree.insert(id, 'end', text = "Checksum:\t" + tcp_checksum)
