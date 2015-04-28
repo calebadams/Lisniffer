@@ -1,4 +1,4 @@
 #!/bin/bash
 
-sudo python icmp-transmitter.py &
-sudo python scapy-sniffer.py &
+python icmp-transmitter.py &
+python scapy-sniffer.py &
