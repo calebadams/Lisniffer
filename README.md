@@ -9,16 +9,20 @@ Lisniffer is a multithreaded packet sniffer written and tested with Python 2.7.6
 4. Navigate through and analyze the captured packets
 5. If the machine is connected to a default printer ($ lpstat -d) the main GUI "Print" button can be used to print the contents of a generated output file called packets.txt
 
-# To run the script
+# To start the app
 
 Enter the following command in the proper working directory of the source files:
 
-$ sudo python scapy-sniffer.py
+$ sudo chmod +x start.sh
 
-# To transmit ICMP packets
-Open a second command window and enter the following command:
+$ sudo ./start.sh
 
-$ sudo python icmp-transmitter.py
+# To stop 
+Enter the following command in the same terminal
+
+$ sudo chmod +x stop.sh
+
+$ sudo ./stop.sh
 
 # To Install scapy (Linux):
 Run the following commands
