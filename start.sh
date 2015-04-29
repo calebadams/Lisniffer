@@ -1,4 +1,4 @@
 #!/bin/bash
 
-python icmp-transmitter.py &
+ping "www.google.com" > /dev/null &
 python scapy-sniffer.py &
