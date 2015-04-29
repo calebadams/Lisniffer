@@ -17,7 +17,7 @@ $ sudo chmod +x start.sh
 
 $ sudo ./start.sh
 
-# To stop 
+# To stop the app
 Enter the following command in the same terminal
 
 $ sudo chmod +x stop.sh
